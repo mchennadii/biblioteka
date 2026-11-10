@@ -681,8 +681,14 @@ header.top nav.tabs .tab span{font-size:9px;letter-spacing:-.2px}
 
 /* v113: nav aligned to first card bottom, slightly larger */
 header.top nav.tabs,body.has-pub header.top nav.tabs{bottom:var(--nbot,calc(12px + env(safe-area-inset-bottom,0px)))}
+html[style*="--ntop"] header.top nav.tabs,html[style*="--ntop"] body.has-pub header.top nav.tabs{top:var(--ntop);bottom:auto;transform:translateY(-100%)}
 header.top nav.tabs .tab{width:58px;height:58px;border-radius:29px}
 header.top nav.tabs .tab span{font-size:10px}
+
+/* v114 */
+.usrs{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.usr{display:flex;flex-direction:column;gap:2px;padding:12px 16px;border-radius:18px;background:rgba(255,255,255,.14);color:#fff;word-break:break-word}
+.usr span{opacity:.9;font-size:14px}.usr small{opacity:.7;font-size:12px}
 </style>
 
 <div id="root">
@@ -933,6 +939,7 @@ function renderAdmin(){
    '<div class="list-actions admadd"><button class="btn primary" data-action="adm-new">Добавить книгу</button></div>'+
    '<section class="block" id="loanPanel"></section>'+
    '<section class="block" id="statPanel"></section>'+
+   '<section class="block" id="usersPanel"></section>'+
    '<section class="block" id="admBooks">'+admBooksHTML()+'</section>'+
    '<section class="block" id="histPanel"></section>'+
    '<section class="block" id="siteSec">'+siteSecHTML()+'</section>';
@@ -1005,7 +1012,7 @@ function route(){
   else if(v==='profile')renderProfile();
   else if(!adminChecked)$('#app').innerHTML='<div class="page-head"><p class="muted">Проверка доступа…</p></div>';
   else if(!isAdmin)$('#app').innerHTML='<div class="empty"><p class="empty-title">Для библиотекаря</p><p>Эта страница для того, кто управляет библиотекой.</p><a class="btn primary" href="#catalog">Назад к книгам</a></div>';
-  else{renderAdmin();updLoanPanel();updStatPanel()}
+  else{renderAdmin();updLoanPanel();updStatPanel();updUsersPanel()}
   var ty=(prevView&&prevView!==v)?(scrollMem[v]||0):prevY;
   function rs(){window.scrollTo({top:ty,behavior:'instant'})}
   rs();requestAnimationFrame(rs);setTimeout(rs,120);
@@ -1026,6 +1033,8 @@ document.addEventListener('click',function(e){
    case 'toggle':toggleSaved(id);break;
    case 'copy-list':copyList();break;
     case 'set-lang':setLang(el.dataset.lang);break;
+    case 'adm-users-toggle':S.admUsers=!S.admUsers;if(S.admUsers)loadUsers();updUsersPanel();break;
+    case 'adm-users-refresh':loadUsers();break;
     case 'adm-books-toggle':S.admBooks=!S.admBooks;$('#admBooks').innerHTML=admBooksHTML();break;
     case 'req-send':openReqDlg(id);break;
     case 'set-view':VIEW=el.dataset.view==='list'?'list':'grid';try{localStorage.setItem('lib-view',VIEW)}catch(e){}renderProfile();break;
@@ -1311,6 +1320,28 @@ function statPanelHTML(){
    '<h4>Чаще всего запрашивают</h4>'+(topReq.length?hbars(topReq):'<p class="muted small">Запросов пока нет.</p>')+
    '<p class="muted small">Считаются визиты участников, вошедших в аккаунт и допущенных на страницу. Анонимные посетители по ссылке в статистику не попадают.</p>';
 }
+var UL={list:null,busy:false,err:''};
+function loadUsers(){
+  if(!userApi||!userApi.list||UL.busy)return;
+  UL.busy=true;UL.err='';updUsersPanel();
+  Promise.resolve(userApi.list()).then(function(l){UL.list=l||[]}).catch(function(){UL.err='Не удалось загрузить список.'}).then(function(){UL.busy=false;updUsersPanel()});
+}
+function usersHTML(){
+  var open=S.admUsers,n=UL.list?UL.list.length:'';
+  var h='<button type="button" class="plaque" data-action="adm-users-toggle" aria-expanded="'+!!open+'"><span><b>Читатели</b>'+(n!==''?'<span class="pn">'+n+'</span>':'')+'</span>'+I.chev+'</button>';
+  if(!open)return h;
+  h+='<div class="usrs">';
+  if(UL.busy&&!UL.list)h+='<p class="muted">Загрузка…</p>';
+  else if(UL.err)h+='<p class="muted">'+esc(UL.err)+'</p>';
+  else if(!UL.list||!UL.list.length)h+='<p class="muted">Пока никто не зарегистрировался.</p>';
+  else h+=UL.list.map(function(u){
+    var r=O.reqs&&O.reqs[u.id],c=r&&r.items?r.items.length:0,d=u.created_at?new Date(u.created_at).toLocaleDateString('ru-RU'):'';
+    return '<div class="usr"><b>'+esc(u.name||'Без имени')+'</b><span>'+esc(u.email||'почта не указана')+'</span><small>'+(d?'с '+d:'')+(c?' · запросов: '+c:'')+'</small></div>';
+  }).join('');
+  h+='<div class="actions"><button class="btn sm" data-action="adm-users-refresh"'+(UL.busy?' disabled':'')+'>Обновить</button></div></div>';
+  return h;
+}
+function updUsersPanel(){var p=document.getElementById('usersPanel');if(!p)return;if(!userApi||!userApi.list){p.innerHTML='';return}p.innerHTML=usersHTML()}
 function updStatPanel(){var p=document.getElementById('statPanel');if(!p)return;var a=document.activeElement;if(a&&(a.id==='stM'||a.id==='stY'))return;p.innerHTML=statSectionHTML()}
 function admFiltered(){
   var q=S.admQ.trim().toLowerCase();
@@ -1613,10 +1644,10 @@ async function sbStart(){
     var ses=(await sb.auth.getSession()).data.session;
     me=sbMe(ses&&ses.user);
     db={doc:sbDoc,collection:sbCol};
-    userApi={profiles:function(ids){return sb.from('profiles').select('id,name').in('id',ids).then(function(r){var o={};(r.data||[]).forEach(function(x){o[x.id]={name:x.name}});return o})}};
+    userApi={list:function(){return sb.from('profiles').select('id,name,email,created_at').then(function(r){if(r.error)throw r.error;return (r.data||[]).sort(function(x,y){return String(y.created_at||'').localeCompare(String(x.created_at||''))})})},profiles:function(ids){return sb.from('profiles').select('id,name').in('id',ids).then(function(r){var o={};(r.data||[]).forEach(function(x){o[x.id]={name:x.name}});return o})}};
     if(me.id){
       R.canWrite=true;
-      try{await sb.from('profiles').upsert({id:me.id,name:me.name})}catch(e){}
+      try{await sb.from('profiles').upsert({id:me.id,name:me.name,email:(ses&&ses.user&&ses.user.email)||null})}catch(e){}
       try{var a=await sb.rpc('is_admin');isAdmin=a.data===true}catch(e){}
     }
     if(cameBack&&me.id)location.hash='#profile';
@@ -1637,10 +1668,19 @@ renderHead();route();
 })();
 </script>
 <script>
-(function(){var t=0;function place(){t=0;try{var li=document.querySelector('ul.books > li');if(!li)return;var r=li.getBoundingClientRect();if(!r.height)return;var b=innerHeight-(r.bottom+scrollY);var min=12;b=Math.max(min,Math.min(b,innerHeight-200));document.documentElement.style.setProperty('--nbot',Math.round(b)+'px')}catch(e){}}
+(function(){var t=0;
+function onBooks(){return !/^#(list|profile|admin)/.test(location.hash)}
+function place(){t=0;try{
+ if(!onBooks()||scrollY>2||document.documentElement.classList.contains('sheet-open'))return;
+ var li=document.querySelector('#app ul.books > li');if(!li)return;
+ var r=li.getBoundingClientRect();if(!r.height||!r.width)return;
+ var y=Math.round(Math.max(120,Math.min(r.bottom,innerHeight-12)));
+ document.documentElement.style.setProperty('--ntop',y+'px')}catch(e){}}
 function q(){if(!t)t=requestAnimationFrame(place)}
-addEventListener('resize',q);addEventListener('load',q);addEventListener('orientationchange',q);
-new MutationObserver(q).observe(document.documentElement,{childList:true,subtree:true});q();setTimeout(q,500);setTimeout(q,1500);
+['resize','orientationchange','load','hashchange','scroll'].forEach(function(e){addEventListener(e,q,{passive:true})});
+new MutationObserver(q).observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('load',q,true);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(q);
+q();setTimeout(q,600);setTimeout(q,1800);
 })();
 </script>
 
