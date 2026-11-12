@@ -902,13 +902,14 @@ svg.bars line,svg.bars path{stroke:rgba(53,99,233,.25)}
 .dd-panel{background:#fff!important;box-shadow:0 14px 34px rgba(30,60,160,.18)!important}
 .filters:has(.dd-panel:not([hidden])){z-index:50!important}
 .dd-opt:has(input:checked){background:#fff!important;box-shadow:inset 0 0 0 1.5px #3563E9!important}
-.chips[aria-label="Язык интерфейса"]{display:grid!important;grid-template-columns:repeat(3,max-content);justify-content:start;gap:8px}
+.chips.langs{display:grid!important;grid-template-columns:repeat(3,max-content);justify-content:start;gap:8px}
 /* shrink by transform only: no layout/font-size steps */
 .logo{height:46px!important}
 .top h1,.top h1 .nm1,header.top h1 .nm1{font-size:35.4px!important}
 .brand h1{margin-bottom:-5.25px!important}
 .brand{--s:calc(1 - .391*var(--p,0))!important;transform:scale(var(--s))!important;transform-origin:0 0!important;margin-bottom:calc(var(--bh,46px)*(var(--s) - 1))!important;will-change:transform}
 .brand .ld,.logo .ld{transform:translateY(calc(var(--p,0)*26.875%))!important;will-change:transform}
+html{animation:none!important}
 #splash{position:fixed;inset:0;z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f3f4f6;transition:opacity .35s ease,visibility .35s}
 #splash::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,#fff 0,rgba(255,255,255,.85) 90px,rgba(255,255,255,0) 300px),repeating-linear-gradient(90deg,transparent 0,transparent 31px,rgba(20,33,61,.09) 31px,rgba(20,33,61,.09) 32px);background-position:0 0,8px 0}
 #splash.off{opacity:0;visibility:hidden}
@@ -1212,22 +1213,23 @@ var SHELL='<div id="root"><div class="wrap"><header class="top"><div class="bran
   upd();
 })();
 (function(){
-var root=document.documentElement,tk=0,cmp=false,RANGE=420;var NATIVE=!!(window.CSS&&CSS.supports&&CSS.supports('animation-timeline','scroll()'));
+var root=document.documentElement,tk=0,cmp=false,RANGE=420;var NATIVE=false;
 function set(k,v){root.style.setProperty(k,v)}
 function m(){var t=document.querySelector('header.top'),f=document.querySelector('.filters'),br=document.querySelector('.brand');
   if(br)set('--bh',br.offsetHeight+'px');
   root.classList.toggle('hasf',!!f);
   if(f&&!cmp)set('--fh',f.offsetHeight+'px')}
-var PT=0,PC=0,PR=0;function sm(){PR=0;PC+=(PT-PC)*.1;if(Math.abs(PT-PC)<.0004)PC=PT;set('--p',PC.toFixed(4));if(PC!==PT)PR=requestAnimationFrame(sm)}
+function setP(v){var h=document.querySelector('header.top');if(h)h.style.setProperty('--p',v)}
 function sc(){tk=0;var y=window.scrollY||0;var lv=(typeof S!=='undefined'&&(S.view==='list'||S.view==='profile'));var subT=lv?(S.view==='profile'?'Профиль':'Мой список'):'';var t=lv?1:Math.max(0,Math.min(1,y/RANGE));var P=t*(2-t);var hs=document.getElementById('hdrSub');if(hs&&hs.getAttribute('data-k')!==subT){hs.setAttribute('data-k',subT);hs.textContent=subT}
-  if(!NATIVE||lv){if(!NATIVE)set('--p',P.toFixed(4))}
+  setP(P.toFixed(4));
   root.classList.toggle('listv',lv);
   var app=document.getElementById('app'),th=(document.querySelector('header.top')||{}).offsetHeight||0,fh=parseFloat(getComputedStyle(root).getPropertyValue('--fh'))||0;
   var hidden=!!document.querySelector('.filters')&&app&&fh>=30&&y>=8&&(app.getBoundingClientRect().top+fh<=th+1);
   root.classList.toggle('done',y>=RANGE-1);
   if(hidden!==cmp){cmp=hidden;root.classList.toggle('cmp',cmp);if(!cmp)root.classList.remove('fopen')}
   m()}
-addEventListener('scroll',function(){if(!NATIVE&&!(typeof S!=='undefined'&&(S.view==='list'||S.view==='profile'))){var t=Math.max(0,Math.min(1,(window.scrollY||0)/RANGE));set('--p',(t*(2-t)).toFixed(4))}if(!tk)tk=requestAnimationFrame(sc)},{passive:true});
+var lastY=-1,idle=0,lp=0;function tickP(){lp=0;var y=window.scrollY||0;if(y!==lastY){lastY=y;idle=0;if(!(typeof S!=='undefined'&&(S.view==='list'||S.view==='profile'))){var t=Math.max(0,Math.min(1,y/RANGE));setP((t*(2-t)).toFixed(4))}}else idle++;if(idle<10)lp=requestAnimationFrame(tickP)}
+addEventListener('scroll',function(){if(!lp)lp=requestAnimationFrame(tickP);if(!tk)tk=requestAnimationFrame(sc)},{passive:true});
 addEventListener('resize',m);addEventListener('load',m);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(m);setInterval(sc,300);addEventListener('hashchange',function(){setTimeout(sc,0);setTimeout(sc,120)});if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){try{renderTabs()}catch(e){}});
 document.addEventListener('click',function(ev){var b=ev.target.closest&&ev.target.closest('#miniFilter');if(!b)return;
   var open=!root.classList.contains('fopen');root.classList.toggle('fopen',open)});
@@ -1674,7 +1676,7 @@ function renderProfile(){
      (canSend()?'<form id="nickForm" class="nick"><div class="field"><label for="nick">Ваше имя для библиотекаря</label><input id="nick" type="text" maxlength="60" autocomplete="off" value="'+esc((R.reqs&&R.reqs.name)||'')+'"></div><button class="btn sm" type="submit">Сохранить</button></form>':'<p class="muted small">Не удалось подключиться к базе. Попробуйте позже.</p>')+'<button type="button" class="link" data-action="sb-out">Выйти</button></section>';
   }
   var langs=[['uk','Українська'],['de','Deutsch'],['en','English'],['ro','Română'],['ru','Русский']];
-  var set='<section class="pcard"><h3>Настройки</h3><p class="muted small" style="margin-top:0">Язык интерфейса</p><div class="chips" role="group" aria-label="Язык интерфейса">'+langs.map(function(l){return '<button type="button" class="chip" lang="'+l[0]+'" data-notr="1" data-action="set-lang" data-lang="'+l[0]+'" aria-pressed="'+(UI===l[0])+'">'+l[1]+'</button>'}).join('')+'</div><p class="muted small">Названия книг и имена авторов не переводятся.</p><p class="muted small" style="margin-bottom:6px">Отображение книг</p><div class="chips" role="group" aria-label="Отображение книг"><button type="button" class="chip vchip" data-action="set-view" data-view="grid" aria-pressed="'+(VIEW==='grid')+'">'+'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg>'+'Плитка</button><button type="button" class="chip vchip" data-action="set-view" data-view="list" aria-pressed="'+(VIEW==='list')+'">'+'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="5" height="6" rx="1.4"/><path d="M12 6h8M12 9h5"/><rect x="4" y="14" width="5" height="6" rx="1.4"/><path d="M12 16h8M12 19h5"/></svg>'+'Список</button></div></section>';
+  var set='<section class="pcard"><h3>Настройки</h3><p class="muted small" style="margin-top:0">Язык интерфейса</p><div class="chips langs" role="group" aria-label="Язык интерфейса">'+langs.map(function(l){return '<button type="button" class="chip" lang="'+l[0]+'" data-notr="1" data-action="set-lang" data-lang="'+l[0]+'" aria-pressed="'+(UI===l[0])+'">'+l[1]+'</button>'}).join('')+'</div><p class="muted small">Названия книг и имена авторов не переводятся.</p><p class="muted small" style="margin-bottom:6px">Отображение книг</p><div class="chips" role="group" aria-label="Отображение книг"><button type="button" class="chip vchip" data-action="set-view" data-view="grid" aria-pressed="'+(VIEW==='grid')+'">'+'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg>'+'Плитка</button><button type="button" class="chip vchip" data-action="set-view" data-view="list" aria-pressed="'+(VIEW==='list')+'">'+'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="5" height="6" rx="1.4"/><path d="M12 6h8M12 9h5"/><rect x="4" y="14" width="5" height="6" rx="1.4"/><path d="M12 16h8M12 19h5"/></svg>'+'Список</button></div></section>';
   var out=acc;
   if(me.id){
     var reqLi=pend.map(function(x){return '<li><span class="ht"><b>'+esc(x.title)+'</b>'+(x.author?'<span class="muted"> · '+esc(x.author)+'</span>':'')+'</span><span class="hs s-pending">Ожидает подтверждения</span><span class="hd">'+esc(fmtISO(x.want)||fmtD(x.at))+'</span><button class="link" type="button" data-action="req-cancel" data-rid="'+esc(x.id)+'">Отменить запрос</button></li>'}).join('')+waiting.map(function(h){var li=histLi(h);if(h.status==='proposed')li=li.replace(/<\/li>$/,'<span class="hact"><button class="btn sm primary" type="button" data-action="req-confirm" data-rid="'+esc(h.id)+'">Подходит</button><button class="btn sm" type="button" data-action="req-refuse" data-rid="'+esc(h.id)+'">Отказаться</button></span></li>');return li}).join('');
